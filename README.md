@@ -91,7 +91,7 @@ Pasi de testare:
 
     Continuam spre checkout si debifam optiunea de "Ship to the same address" ca sa punem o adresa de livrare diferita de cea de facturare.
 
-    Selectam metoda de plata "Purchase order" (comanda B2B pe firma) si punem un cod de identificare.
+    Selectam metoda de plata "Check/Money Order" si trecem la urmatorul pas.
 
     (Assert) Confirmam comanda si validam mesajul final de succes.
 
@@ -153,12 +153,10 @@ graph TD
     
     s --> t[Formular nou: Shipping address]
     class t actiune
-    t --> u[Selectare plata: Purchase order]
+    t --> u[Selectare plata: Check/Money Order]
     class u actiune
-    u --> v[Input: numar PO -> confirmare]
-    class v actiune
     
-    v --> w{Assert: h1 == 'Your order has been successfully processed!'}
+    u --> w{Assert: h1 == 'Your order has been successfully processed!'}
     class w asertiune
     w -- nu --> x([Fail: eroare plasare comanda PO])
     class x fail
