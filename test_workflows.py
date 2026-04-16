@@ -11,7 +11,7 @@ def apply_stealth(page: Page):
 BASE_URL = "https://demo.nopcommerce.com"
 
 def wait_for_cloudflare(page: Page):
-    page.wait_for_timeout(2000)
+    page.wait_for_timeout(3000)
 
 def test_guest_shopping(page: Page):
     # Start guest session and navigate to demo.nopcommerce.com
@@ -231,3 +231,106 @@ def test_pc_configurator(page: Page):
     # Verify checkout completion URL
     expect(page).to_have_url(re.compile(r".*/checkout/completed"))
     wait_for_cloudflare(page)
+
+def test_compare_products_table(page: Page):
+    # Go to site
+    page.goto(BASE_URL)
+    
+    # Search HTC and add to compare
+    page.fill("#small-searchterms", "htc")
+    page.locator("button.search-box-button").click()
+    
+    with page.expect_response(re.compile(r".*compare.*", re.IGNORECASE)):
+        page.locator(".product-item").first.locator("button.add-to-compare-list-button").click()
+    page.locator("#bar-notification .close").click()
+
+    # Search Apple and add to compare
+    page.fill("#small-searchterms", "apple")
+    page.locator("button.search-box-button").click()
+    
+    with page.expect_response(re.compile(r".*compare.*", re.IGNORECASE)):
+        page.locator(".product-item").first.locator("button.add-to-compare-list-button").click()
+
+    # Open comparison
+    page.locator("a[href='/compareproducts']").first.click()
+
+    # Check 3 columns
+    table_rows = page.locator("table.compare-products-table tbody tr")
+    column_count = table_rows.first.locator("td").count()
+    assert column_count == 3, f"Expected 3 columns, found {column_count}"
+
+    # Verify both products in table
+    name_row_text = page.locator("tr.product-name").inner_text().lower()
+    assert "htc" in name_row_text, "HTC is missing from the compare table"
+    assert "apple" in name_row_text, "Apple is missing from the compare table"
+
+    # Clear list
+    page.locator("a.clear-list").click()
+    
+    # Check empty message
+    expect(page.locator("div.no-data")).to_have_text("You have no items to compare.")
+
+def test_digital_product(page: Page):
+    # Go to digital downloads
+    page.goto(BASE_URL)
+    wait_for_cloudflare(page)
+
+    page.locator("a.menu__link[href='/digital-downloads']").click()
+
+    # Add to cart
+    with page.expect_navigation():
+        page.locator(".product-item").first.locator("button.product-box-add-to-cart-button").click()
+
+    # Click the actual Add to Cart button on the product page
+    page.wait_for_timeout(1000) 
+    with page.expect_response(re.compile(r".*addproducttocart.*", re.IGNORECASE)):
+        page.locator("button.add-to-cart-button").click()
+        
+    page.locator("#bar-notification .close").click()
+
+    # Go to checkout
+    page.locator(".ico-cart").click()
+    page.locator("#termsofservice").check()
+    page.locator("#checkout").click()
+    page.locator("button.checkout-as-guest-button").click()
+
+    # Billing address
+    with page.expect_response("**/getstatesbycountryid*"):
+        page.locator("#BillingNewAddress_CountryId").select_option(value="237")
+    page.locator("#BillingNewAddress_StateProvinceId").select_option(index=1)
+    
+    page.locator("#BillingNewAddress_FirstName").fill("Digi")
+    page.locator("#BillingNewAddress_LastName").fill("Buyer")
+    page.locator("#BillingNewAddress_Email").fill("digi@example.com")
+    page.locator("#BillingNewAddress_City").fill("New York")
+    page.locator("#BillingNewAddress_Address1").fill("123 Digi St")
+    page.locator("#BillingNewAddress_ZipPostalCode").fill("10001")
+    page.locator("#BillingNewAddress_PhoneNumber").fill("1234567890")
+
+    page.locator(".new-address-next-step-button:visible").click()
+    
+    # Check if shipping steps skipped for digital products
+    try:
+        expect(page.locator("li#opc-payment_method")).to_have_class(re.compile(r"active"), timeout=3000)
+    except AssertionError:
+        print("\nShipping steps not skipped for digital product")
+        page.locator(".shipping-method-next-step-button:visible").click()
+
+    # Select credit card
+    page.locator("#paymentmethod_1").check()
+    page.locator(".payment-method-next-step-button:visible").click()
+    
+    # Card details
+    page.locator("#CardholderName").fill("Digi Buyer")
+    page.locator("#CardNumber").fill("0000 0000 0000 0000")
+    page.locator("#ExpireMonth").select_option(value="04")
+    page.locator("#ExpireYear").select_option(value="2030")
+    page.locator("#CardCode").fill("123")
+    
+    page.locator(".payment-info-next-step-button:visible").click()
+    
+    # Confirm order
+    page.locator(".confirm-order-next-step-button:visible").click()
+    
+    # Check success message
+    expect(page.locator(".order-completed .title")).to_have_text("Your order has been successfully processed!")
