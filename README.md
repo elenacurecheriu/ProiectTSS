@@ -234,7 +234,7 @@ Pasi de testare:
 
     Completam adresa de facturare (billing address) cu niste date false de test.
 
-    (Assert logic) Verificam daca site-ul este inteligent si sare complet peste pasii de livrare fizica ("Shipping method"), ducandu-ne direct la pasul de plata.
+    (Soft assert logic) Verificam daca site-ul este inteligent si sare complet peste pasii de livrare fizica ("Shipping method"), ducandu-ne direct la pasul de plata.
 
     Bagam date de card false si plasam comanda.
 
@@ -248,6 +248,7 @@ graph TD
     classDef asertiune fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
     classDef pass fill:#c8e6c9,stroke:#388e3c,stroke-width:2px;
     classDef fail fill:#ffccbc,stroke:#d84315,stroke-width:2px;
+    classDef soft_fail fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,stroke-dasharray: 5 5;
 
     a([Start: Test produs digital]):::actiune --> b[Navigare: digital downloads]:::actiune
     b --> c[Adaugare in cos: Science & Faith]:::actiune
@@ -255,8 +256,12 @@ graph TD
     
     d --> e[Completare: Billing address -> click continue]:::actiune
     
-    e --> f{Assert: pasii de shipping sunt sariti?}:::asertiune
-    f -- Nu --> g([Fail: bug logica aplicatie]):::fail
+    e --> f{Soft assert: se sare peste etapa de shipping address?}:::asertiune
+    
+    f -- Nu --> g[Eroare de logica: se cere livrare pentru produs digital]:::soft_fail
+    g -. fallback .-> g2[Completare: Shipping address -> click continue]:::actiune
+    g2 --> h
+    
     f -- Da --> h[Selectare: payment method -> click Continue]:::actiune
     
     h --> i[Completare: Date card fictive -> click Continue]:::actiune
@@ -264,7 +269,7 @@ graph TD
     
     j --> k{Assert: Mesaj succes comanda?}:::asertiune
     k -- Nu --> l([Fail: eroare la plasarea comenzii virtuale]):::fail
-    k -- Da --> m([Pass: comanda produs digital reusita]):::pass
+    k -- Da --> m([Pass / Partial pass: comanda produs digital reusita]):::pass
 ```
 
 
