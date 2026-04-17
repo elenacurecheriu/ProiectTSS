@@ -1,5 +1,6 @@
 import uuid
 import re
+import time
 from playwright.sync_api import Page, expect
 from playwright_stealth import Stealth
 import pytest
@@ -334,3 +335,193 @@ def test_digital_product(page: Page):
     
     # Check success message
     expect(page.locator(".order-completed .title")).to_have_text("Your order has been successfully processed!")
+
+def test_register_and_order(page: Page):
+    # Generate a unique email using timestamp
+    unique_email = f"testuser_{int(time.time())}@example.com"
+    password = "TestPass123!"
+
+    # Navigate to Register page
+    page.goto(BASE_URL)
+    wait_for_cloudflare(page)
+    page.locator("a.ico-register").click()
+
+    # Fill out registration form
+    page.locator("#gender-male").check()
+    page.locator("#FirstName").fill("Test")
+    page.locator("#LastName").fill("User")
+    page.locator("#Email").fill(unique_email)
+    page.locator("#Password").fill(password)
+    page.locator("#ConfirmPassword").fill(password)
+
+    # Submit registration
+    page.locator("#register-button").click()
+    page.wait_for_load_state("networkidle")
+
+    # Assert: registration completed successfully
+    expect(page.locator("div.result")).to_have_text("Your registration completed")
+
+    # Continue after registration
+    page.locator("a.register-continue-button").click()
+
+    # Search for Nokia Lumia and add to cart
+    page.fill("#small-searchterms", "Nokia Lumia")
+    page.locator("button.search-box-button").click()
+    page.locator(".product-item").first.locator("h2 a").click()
+
+    with page.expect_response(re.compile(r".*addproducttocart.*", re.IGNORECASE)):
+        page.locator("button.add-to-cart-button").click()
+
+    expect(page.locator("div.bar-notification.success")).to_be_visible()
+    page.locator("#bar-notification .close").click()
+
+    # Navigate to cart and checkout
+    page.locator(".ico-cart").click()
+    page.locator("#termsofservice").check()
+    page.locator("#checkout").click()
+
+    # Assert: login/guest step is skipped (user is already logged in after registration)
+    # The checkout should go directly to billing address step
+    expect(page.locator("li#opc-billing")).to_have_class(re.compile(r"active"), timeout=5000)
+
+    # Fill out billing/shipping address for the first time
+    with page.expect_response("**/getstatesbycountryid*"):
+        page.locator("#BillingNewAddress_CountryId").select_option(value="237")
+    page.locator("#BillingNewAddress_StateProvinceId").select_option(index=1)
+
+    page.locator("#BillingNewAddress_FirstName").fill("Test")
+    page.locator("#BillingNewAddress_LastName").fill("User")
+    page.locator("#BillingNewAddress_Email").fill(unique_email)
+    page.locator("#BillingNewAddress_City").fill("New York")
+    page.locator("#BillingNewAddress_Address1").fill("123 Register St")
+    page.locator("#BillingNewAddress_ZipPostalCode").fill("10001")
+    page.locator("#BillingNewAddress_PhoneNumber").fill("1234567890")
+
+    page.locator("#billing-buttons-container .new-address-next-step-button:visible").click()
+
+    # Select shipping method (Ground by default)
+    page.locator(".shipping-method-next-step-button:visible").click()
+
+    # Select Credit card payment method
+    page.locator("#paymentmethod_1").check()
+    page.locator(".payment-method-next-step-button:visible").click()
+
+    # Fill in card details
+    page.locator("#CardholderName").fill("Test User")
+    page.locator("#CardNumber").fill("0000 0000 0000 0000")
+    page.locator("#ExpireMonth").select_option(value="04")
+    page.locator("#ExpireYear").select_option(value="2030")
+    page.locator("#CardCode").fill("123")
+
+    page.locator(".payment-info-next-step-button:visible").click()
+
+    # Confirm order
+    page.locator(".confirm-order-next-step-button:visible").click()
+    page.wait_for_load_state("networkidle")
+
+    # Assert: order placed successfully from a freshly registered account
+    expect(page).to_have_url(re.compile(r".*/checkout/completed"))
+    expect(page.locator(".order-completed .title")).to_have_text("Your order has been successfully processed!")
+
+# Pre-created account credentials (registered once on the demo site)
+PERSISTENT_EMAIL = "persistent.tester2026@example.com"
+PERSISTENT_PASSWORD = "PersistTest123!"
+
+def _ensure_account_exists(page: Page):
+    """Register the persistent account if it doesn't already exist."""
+    page.goto(f"{BASE_URL}/register")
+    wait_for_cloudflare(page)
+    page.locator("#gender-male").check()
+    page.locator("#FirstName").fill("Persistent")
+    page.locator("#LastName").fill("Tester")
+    page.locator("#Email").fill(PERSISTENT_EMAIL)
+    page.locator("#Password").fill(PERSISTENT_PASSWORD)
+    page.locator("#ConfirmPassword").fill(PERSISTENT_PASSWORD)
+    page.locator("#register-button").click()
+    page.wait_for_load_state("networkidle")
+
+    # If account already exists, the site shows an error; that's fine — just log in instead
+    if page.locator("div.result").is_visible():
+        # Registration succeeded, log out so the test starts clean
+        page.locator("a.ico-logout").click()
+        page.wait_for_load_state("networkidle")
+    else:
+        # Account already existed, navigate to login
+        page.goto(f"{BASE_URL}/login")
+        wait_for_cloudflare(page)
+
+def _login(page: Page):
+    """Log in with the persistent account."""
+    page.goto(f"{BASE_URL}/login")
+    wait_for_cloudflare(page)
+    page.locator("#Email").fill(PERSISTENT_EMAIL)
+    page.locator("#Password").fill(PERSISTENT_PASSWORD)
+    page.locator("button.login-button").click()
+    page.wait_for_load_state("networkidle")
+
+def test_login_persistence(page: Page):
+    # Precondition: ensure the persistent account exists
+    _ensure_account_exists(page)
+
+    # Step 1: Log in with hardcoded credentials
+    _login(page)
+
+    # Assert: 'My account' link is visible (login succeeded)
+    expect(page.locator("a.ico-account")).to_be_visible()
+
+    # Step 2: Navigate to My Account -> Addresses and add a new address
+    page.locator("a.ico-account").click()
+    page.locator("#main a[href='/customer/addresses']").click()
+    page.locator("button.add-address-button").click()
+
+    address_city = f"TestCity{int(time.time())}"
+    page.locator("#Address_FirstName").fill("Persistent")
+    page.locator("#Address_LastName").fill("Tester")
+    page.locator("#Address_Email").fill(PERSISTENT_EMAIL)
+    with page.expect_response("**/getstatesbycountryid*"):
+        page.locator("#Address_CountryId").select_option(value="237")
+    page.locator("#Address_StateProvinceId").select_option(index=1)
+    page.locator("#Address_City").fill(address_city)
+    page.locator("#Address_Address1").fill("456 Persistence Ave")
+    page.locator("#Address_ZipPostalCode").fill("10002")
+    page.locator("#Address_PhoneNumber").fill("5551234567")
+    page.locator("button.save-address-button").click()
+    page.wait_for_load_state("networkidle")
+
+    # Step 3: Search for a product and add it to cart
+    page.fill("#small-searchterms", "Nokia Lumia")
+    page.locator("button.search-box-button").click()
+    page.locator(".product-item").first.locator("h2 a").click()
+
+    with page.expect_response(re.compile(r".*addproducttocart.*", re.IGNORECASE)):
+        page.locator("button.add-to-cart-button").click()
+    expect(page.locator("div.bar-notification.success")).to_be_visible()
+    page.locator("#bar-notification .close").click()
+
+    # Step 4: Log out to destroy the session
+    page.locator("a.ico-logout").click()
+    page.wait_for_load_state("networkidle")
+
+    # Step 5: Assert that the Login link reappeared (logout confirmed)
+    expect(page.locator("a.ico-login")).to_be_visible()
+
+    # Step 6: Log in again with the same credentials
+    _login(page)
+
+    # Step 7: Assert cart persistence — product should still be in the cart
+    cart_qty = page.locator("a.ico-cart .cart-qty").inner_text()
+    cart_count = int(re.sub(r'[^\d]', '', cart_qty))
+    assert cart_count > 0, f"Cart is empty after re-login! Cart badge shows: {cart_qty}"
+
+    # Step 8: Navigate to cart and start checkout
+    page.locator(".ico-cart").click()
+    page.locator("#termsofservice").check()
+    page.locator("#checkout").click()
+
+    # Assert: the previously saved address appears in the billing address dropdown
+    address_select = page.locator("#billing-address-select")
+    expect(address_select).to_be_visible(timeout=5000)
+    dropdown_text = address_select.inner_text()
+    assert "persistence ave" in dropdown_text.lower() or address_city.lower() in dropdown_text.lower(), \
+        f"Saved address not found in billing dropdown! Dropdown contains: {dropdown_text}"
+    
