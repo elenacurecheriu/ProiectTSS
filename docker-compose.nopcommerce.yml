@@ -1,0 +1,34 @@
+services:
+  nopcommerce-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: nopcommerce-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "NopCommerce_StrongPass_123!"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
+    volumes:
+      - nopcommerce_sql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/1433'"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  nopcommerce-web:
+    image: nopcommerceteam/nopcommerce:latest
+    container_name: nopcommerce-web
+    depends_on:
+      nopcommerce-db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    environment:
+      ASPNETCORE_URLS: "http://+:80"
+    volumes:
+      - nopcommerce_app_data:/app/App_Data
+
+volumes:
+  nopcommerce_sql_data:
+  nopcommerce_app_data:

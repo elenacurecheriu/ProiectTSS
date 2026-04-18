@@ -1,0 +1,23 @@
+{
+  "name": "test-workflows",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "cypress run",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "cy:open:chrome": "cypress open --browser chrome",
+    "cy:run:chrome": "cypress run --browser chrome --headed",
+    "cy:open:local": "cypress open --browser chrome --config baseUrl=http://localhost:8080",
+    "cy:run:local": "cypress run --browser chrome --config baseUrl=http://localhost:8080"
+  },
+  "devDependencies": {
+    "cypress-real-events": "^1.15.0",
+    "cypress": "^15.14.0",
+    "typescript": "^6.0.3"
+  }
+}
