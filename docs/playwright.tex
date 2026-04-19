@@ -1,0 +1,260 @@
+\chapter{Playwright}
+
+\section{Ce este Playwright?}
+
+Playwright este un framework open-source de automatizare a browserelor, dezvoltat de Microsoft
+și lansat în 2020. Este conceput pentru a testa aplicații web moderne, oferind suport nativ
+pentru trei motoare de browser: \textbf{Chromium}, \textbf{Firefox} și \textbf{WebKit} (Safari).
+Spre deosebire de predecesori precum Selenium, Playwright controlează browserul printr-un
+protocol binar propriu (DevTools Protocol), ceea ce îi conferă viteză și fiabilitate superioare.
+
+Playwright pune la dispoziție API-uri pentru Python, JavaScript/TypeScript, Java și C\#.
+În cadrul acestui proiect a fost utilizat \textbf{API-ul sincron Python}, integrat cu
+runner-ul de teste \texttt{pytest}.
+
+\section{Facilități principale}
+
+\subsection{Suport multi-browser}
+
+Playwright rulează aceleași teste pe Chromium, Firefox și WebKit fără modificări de cod.
+Fiecare motor este distribuit împreună cu biblioteca, eliminând dependența de versiunile
+instalate local pe mașina de test.
+
+\subsection{Auto-wait}
+
+Playwright implementează un mecanism de așteptare automată (\textit{auto-wait}): înainte de
+a interacționa cu un element, framework-ul verifică automat că acesta este vizibil, activat
+și stabil în DOM. Acest comportament elimină necesitatea apelurilor explicite de tip
+\texttt{sleep()} sau \texttt{wait\_for\_element()} în marea majoritate a cazurilor.
+
+\subsection{Generare automată de teste --- Codegen}
+
+Playwright include un instrument de înregistrare a interacțiunilor numit \texttt{codegen}.
+La rularea comenzii, se deschide un browser în care utilizatorul interacționează normal
+cu aplicația, iar Playwright generează automat codul de test corespunzător în timp real.
+
+\begin{lstlisting}[language=bash]
+playwright codegen http://localhost:8080
+\end{lstlisting}
+
+Codul generat poate fi copiat direct în fișierul de test și rafinat ulterior. Aceasta
+accelerează semnificativ scrierea testelor pentru fluxuri noi, eliminând nevoia de a
+identifica manual selectorii elementelor.
+
+\subsection{Interceptarea rețelei}
+
+API-ul \texttt{page.expect\_response()} permite atașarea unui context de așteptare la un
+apel de rețea specific, identificat prin URL sau expresie regulată. Testul este blocat până
+când răspunsul este recepționat, moment în care se poate inspecta statusul sau corpul
+răspunsului. Aceasta este o alternativă robustă la așteptările bazate pe timp fix.
+
+\subsection{Locatori rezilienți}
+
+Playwright introduce conceptul de \textit{Locator}, o referință lazy către un element din DOM.
+Spre deosebire de un \texttt{ElementHandle} clasic (capturat la un moment de timp), un Locator
+re-caută elementul la fiecare interacțiune, adaptându-se la re-randările dinamice ale paginii.
+
+\subsection{Izolarea contextelor de browser}
+
+Fiecare test poate rula într-un context de browser separat (\texttt{BrowserContext}), echivalent
+cu un profil de utilizator distinct. Contextele sunt izolate: cookie-uri, localStorage și cache-ul
+nu se propagă între ele. Plugin-ul \texttt{pytest-playwright} creează automat câte un context și
+o pagină pentru fiecare funcție de test.
+
+\subsection{Mod Trace și raportare}
+
+Playwright include un instrument de înregistrare a execuției (\textit{Trace Viewer}) care
+captează screenshot-uri, snapshot-uri DOM, apeluri de rețea și timeline-ul acțiunilor.
+Fișierul de trace poate fi inspectat ulterior în browser, fără a rula din nou testul.
+
+\section{Configurarea proiectului}
+
+\subsection{Dependențe}
+
+Dependențele proiectului sunt definite în \texttt{requirements.txt}:
+
+\begin{lstlisting}[language=Python, caption={requirements.txt}]
+playwright==1.58.0
+pytest==9.0.3
+pytest-playwright==0.7.2
+pytest-base-url==2.1.0
+playwright-stealth==2.0.3
+\end{lstlisting}
+
+Instalarea se face cu:
+
+\begin{lstlisting}[language=bash]
+pip install -r requirements.txt
+playwright install
+\end{lstlisting}
+
+Comanda \texttt{playwright install} descarcă binarele pentru Chromium, Firefox și WebKit.
+
+\subsection{Bypass Cloudflare cu playwright-stealth}
+
+Instanța publică \texttt{demo.nopcommerce.com} este protejată de Cloudflare, care detectează
+și blochează sesiunile de browser automatizate prin analiza fingerprint-ului JavaScript
+(prezența variabilei \texttt{navigator.webdriver}, absența plugin-urilor, timingul evenimentelor).
+
+Pentru a ocoli această protecție, proiectul utilizează biblioteca \texttt{playwright-stealth},
+care modifică proprietățile expuse de browser astfel încât sesiunea automată să fie
+indistinctibilă de una umană. Integrarea se face printr-un fixture \texttt{pytest} cu
+\texttt{autouse=True}, aplicat global tuturor testelor:
+
+\begin{lstlisting}[language=Python, caption={Fixture global pentru stealth mode}]
+@pytest.fixture(autouse=True)
+def apply_stealth(page: Page):
+    Stealth().apply_stealth_sync(page)
+\end{lstlisting}
+
+Prin declararea \texttt{autouse=True}, fixture-ul este injectat automat în fiecare test
+fără a fi necesar să fie menționat explicit în semnătura funcției.
+
+\section{Implementarea testelor}
+
+\subsection{Structura unui test}
+
+Fiecare test este o funcție Python prefixată cu \texttt{test\_}, care primește ca argument
+obiectul \texttt{page} furnizat de plugin-ul \texttt{pytest-playwright}. Acesta reprezintă
+o instanță de pagină browser gata de utilizare, izolată față de celelalte teste.
+
+\begin{lstlisting}[language=Python, caption={Structura de bază a unui test Playwright}]
+def test_guest_shopping(page: Page):
+    page.goto(BASE_URL)
+    page.locator("a.menu__link[href='/computers']").hover()
+    page.locator("a[href='/notebooks']").click()
+    # ...
+    expect(page.locator(".order-completed .title")).to_have_text(
+        "Your order has been successfully processed!"
+    )
+\end{lstlisting}
+
+\subsection{Interceptarea cererilor AJAX}
+
+Un pattern central în suita de teste este așteptarea răspunsurilor AJAX înainte de a
+continua execuția. Fără această sincronizare, testul ar interacționa cu elemente care
+nu reflectă încă rezultatul operației asincrone.
+
+Exemplul următor verifică că filtrarea produselor după RAM s-a încheiat cu succes înainte
+de a continua:
+
+\begin{lstlisting}[language=Python, caption={Interceptare răspuns AJAX la aplicarea filtrului}]
+with page.expect_response(
+    lambda response: "demo.nopcommerce.com" in response.url
+    and response.request.resource_type in ["xhr", "fetch"]
+) as response_info:
+    page.locator("input[id='attribute-option-9']").check()
+
+assert response_info.value.status == 200, \
+    "Filtrarea asincronă (AJAX) nu a returnat status 200"
+\end{lstlisting}
+
+Blocul \texttt{with page.expect\_response(...)} funcționează ca un context manager: acțiunea
+din interior declanșează cererea, iar Playwright așteaptă răspunsul înainte de a ieși din bloc.
+
+\subsection{Verificarea prețurilor dinamice}
+
+Workflow-ul 2 (Configuratorul PC) implică selectarea unor componente care modifică prețul
+afișat prin AJAX. Testul extrage prețul înainte și după selecție și verifică matematic că
+actualizarea a avut loc:
+
+\begin{lstlisting}[language=Python, caption={Verificare calcul preț dinamic}]
+base_price_text = page.locator("div.product-price span").inner_text()
+base_price = float(re.sub(r'[^\d.]', '', base_price_text))
+
+with page.expect_response(re.compile(r".*productdetails_attributechange.*",
+                                     re.IGNORECASE)):
+    page.locator("input[name='product_attribute_3'][value='7']").check()
+
+new_price_text = page.locator("div.product-price span").inner_text()
+new_price = float(re.sub(r'[^\d.]', '', new_price_text))
+
+assert new_price > base_price, \
+    f"Pretul nu s-a actualizat corect! {new_price} vs {base_price}"
+\end{lstlisting}
+
+\subsection{Soft assertions}
+
+Un \textit{soft assert} este o verificare al cărei eșec nu oprește execuția testului.
+Playwright nu oferă un mecanism nativ pentru soft assertions, însă acestea se implementează
+simplu prin capturarea excepției:
+
+\begin{lstlisting}[language=Python, caption={Implementare soft assert pentru cuponul invalid}]
+try:
+    page.wait_for_selector("div.message-failure", timeout=5000)
+    expect(page.locator("div.message-failure").first).to_have_text(
+        re.compile(r"coupon", re.IGNORECASE)
+    )
+except (AssertionError, Exception) as e:
+    print(f"\nMesajul de eroare pentru cupon nu a aparut. "
+          f"Soft-assert ignorat. Detalii: {e}")
+    pass
+\end{lstlisting}
+
+Dacă mesajul de eroare nu apare (comportament întâlnit uneori pe instanța demo),
+testul înregistrează situația în consolă și continuă spre pașii următori.
+
+\subsection{Gestionarea sesiunilor persistente}
+
+Workflow-ul 6 testează că datele (coș, adrese) supraviețuiesc unui ciclu de logout/login.
+Pentru aceasta, testul utilizează un cont cu credențiale fixe, creat o singură dată:
+
+\begin{lstlisting}[language=Python, caption={Funcție helper pentru autentificare}]
+PERSISTENT_EMAIL = "persistent.tester2026@example.com"
+PERSISTENT_PASSWORD = "PersistTest123!"
+
+def _login(page: Page):
+    page.goto(f"{BASE_URL}/login")
+    page.locator("#Email").fill(PERSISTENT_EMAIL)
+    page.locator("#Password").fill(PERSISTENT_PASSWORD)
+    page.locator("button.login-button").click()
+    page.wait_for_load_state("networkidle")
+\end{lstlisting}
+
+Funcția \texttt{\_ensure\_account\_exists()} încearcă înregistrarea contului; dacă
+primește o eroare (contul există deja), continuă direct cu autentificarea ---
+eliminând necesitatea unui setup manual înainte de prima rulare.
+
+\subsection{Adresă de email unică per rulare}
+
+Workflow-ul 5 (înregistrare cont) necesită un email unic la fiecare rulare pentru a evita
+eroarea \textit{``account already exists''}. Soluția este generarea unui timestamp:
+
+\begin{lstlisting}[language=Python, caption={Generare email unic cu timestamp}]
+unique_email = f"testuser_{int(time.time())}@example.com"
+\end{lstlisting}
+
+\section{Avantaje}
+
+\begin{itemize}
+    \item \textbf{Suport multi-browser nativ}: Chromium, Firefox și WebKit testate cu același cod,
+          fără configurare suplimentară.
+    \item \textbf{Interceptare rețea puternică}: \texttt{expect\_response()} și
+          \texttt{route()} permit sincronizare și modificare a cererilor HTTP direct din test.
+    \item \textbf{Auto-wait robust}: elimină majoritatea așteptărilor explicite, reducând
+          fragilitatea testelor la variații de latență.
+    \item \textbf{Izolare contexte}: fiecare test pornește cu un browser curat, fără interferențe
+          între sesiuni.
+    \item \textbf{Ecosistem Python}: integrare naturală cu \texttt{pytest}, fixtures,
+          parametrizare, și librăriile de analiză/date din ecosistemul Python.
+    \item \textbf{Bypass Cloudflare}: prin \texttt{playwright-stealth}, testele pot rula
+          pe instanțe protejate fără a necesita un mediu local.
+    \item \textbf{Trace Viewer}: debugging post-mortem fără re-rularea testelor.
+\end{itemize}
+
+\section{Dezavantaje}
+
+\begin{itemize}
+    \item \textbf{Configurare inițială mai complexă}: necesită instalarea separată a binarelor
+          de browser și configurarea mediului Python, față de un simplu \texttt{npm install}.
+    \item \textbf{Verbozitate}: codul Python tinde să fie mai explicit față de echivalentul
+          Cypress, mai ales în cazul selectoarelor și așteptărilor condiționale.
+    \item \textbf{Fără Time Travel nativ}: Playwright nu oferă un echivalent al funcției
+          de \textit{time travel debugging} din Cypress App --- reluarea pas cu pas a
+          execuției necesită activarea Trace Viewer înainte de rulare.
+    \item \textbf{Soft assertions manuale}: absența unui mecanism nativ pentru soft assertions
+          obligă la construcții \texttt{try/except} repetitive.
+    \item \textbf{Dependență de stealth pentru site-uri protejate}: pe instanțe publice
+          cu protecție anti-bot, este necesară o bibliotecă externă care poate deveni
+          incompatibilă cu versiuni noi de Playwright.
+\end{itemize}

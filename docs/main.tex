@@ -1,0 +1,63 @@
+\documentclass[12pt,a4paper]{report}
+
+% ---------- pachete ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[romanian]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{setspace}
+\usepackage{float}
+
+\geometry{margin=2.5cm}
+\onehalfspacing
+
+% ---------- stiluri listings ----------
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\definecolor{keywordcolor}{rgb}{0.13,0.29,0.53}
+\definecolor{commentcolor}{rgb}{0.4,0.4,0.4}
+\definecolor{stringcolor}{rgb}{0.16,0.5,0.16}
+
+\lstset{
+    backgroundcolor=\color{codegray},
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{keywordcolor}\bfseries,
+    commentstyle=\color{commentcolor}\itshape,
+    stringstyle=\color{stringcolor},
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    tabsize=4,
+    showstringspaces=false,
+}
+
+% ==============================
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{\fill}
+    {\LARGE \textbf{Testare automată E2E:\\[0.4cm]
+    Playwright vs. Cypress pe o platformă de e-commerce}}
+    \vspace*{\fill}
+\end{titlepage}
+
+\setcounter{tocdepth}{0}
+\tableofcontents
+\newpage
+
+\input{introducere}
+\input{scenarii}
+\input{playwright}
+
+\input{cypress}
+
+\input{concluzii}
+
+\end{document}

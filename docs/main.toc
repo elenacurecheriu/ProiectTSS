@@ -1,0 +1,9 @@
+\babel@toc {romanian}{}\relax 
+\contentsline {chapter}{\numberline {1}Introducere}{2}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Contextul proiectului}{2}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Aplicația testată --- NopCommerce}{2}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Obiectivele proiectului}{3}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Configurarea mediului de testare}{3}{section.1.4}%
+\contentsline {subsection}{\numberline {1.4.1}Instanța locală --- Docker Compose}{3}{subsection.1.4.1}%
+\contentsline {subsection}{\numberline {1.4.2}Suita Playwright --- Python}{3}{subsection.1.4.2}%
+\contentsline {subsection}{\numberline {1.4.3}Suita Cypress --- TypeScript}{4}{subsection.1.4.3}%

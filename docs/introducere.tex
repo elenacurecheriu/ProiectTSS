@@ -1,0 +1,79 @@
+\chapter{Introducere}
+
+\section{Contextul proiectului}
+
+Testarea automată a aplicațiilor web reprezintă o componentă esențială în ciclul de dezvoltare
+al oricărui sistem software modern. Pe măsură ce aplicațiile cresc în complexitate, testarea
+manuală devine insuficientă atât ca acoperire, cât și ca viteză de execuție.
+
+Acest proiect are ca scop implementarea și compararea a două suite de teste automate E2E
+pentru aceeași aplicație țintă, folosind două framework-uri diferite: \textbf{Playwright}
+(Python) și \textbf{Cypress} (TypeScript). Prin implementarea duală a acelorași scenarii de
+testare, proiectul oferă o perspectivă practică asupra diferențelor dintre cele două
+instrumente din punct de vedere al capabilităților tehnice și limitărilor fiecăruia.
+
+\section{Aplicația testată --- NopCommerce}
+
+\textbf{NopCommerce} este o platformă de e-commerce open-source, construită pe ASP.NET Core,
+utilizată pe scară largă atât în mediul academic, cât și în producție. Oferă un flux complet
+de cumpărături: navigare prin catalog, filtrare produse, gestionarea coșului și listei de
+dorințe, înregistrare cont, autentificare, checkout în mai mulți pași și procesare plăți.
+
+Aceastǎ platforma reprezinta un candidat ideal pentru testare E2E, deoarece permite
+acoperirea unor scenarii realiste și complexe: interacțiuni asincrone (AJAX), formulare
+multi-pas, calcul dinamic de prețuri, gestionarea sesiunii și persistența datelor între
+sesiuni.
+
+Testele din acest proiect au fost rulate local, pe o instanță NopCommerce găzduită prin Docker. Instanța publică oficială blochează sesiunile de browser automatizate prin protecția Cloudflare, care detectează traficul generat de framework-uri și returnează erori înainte ca testele să poată interacționa cu aplicația. Framework-ul Playwright a folosit în plus biblioteca \textbf{playwright-stealth} pentru a masca semnăturile de automatizare atunci când instanța publică era accesată.
+
+\section{Obiectivele proiectului}
+
+Proiectul urmărește trei obiective principale:
+
+\begin{enumerate}
+    \item \textbf{Definirea și documentarea scenariilor de testare} --- 6 workflow-uri E2E
+          complete, reprezentând user flow-urile reale pe o platformă
+          de e-commerce.
+    \item \textbf{Implementarea scenariilor în Playwright și Cypress} --- același set de
+          scenarii este implementat în ambele framework-uri, permițând o comparație directă
+          a abordărilor.
+    \item \textbf{Analiza comparativă} --- evaluarea celor două instrumente din perspectiva
+          configurării, scrierii testelor, depanării și a capabilităților tehnice avansate.
+\end{enumerate}
+
+\section{Configurarea mediului de testare}
+
+Aplicația NopCommerce rulează local prin Docker Compose, folosind fișierul
+\texttt{docker-compose.nopcommerce.yml}. Acesta orchestrează două servicii:
+\textbf{nopcommerce-db} (SQL Server 2022, portul 1433) și \textbf{nopcommerce-web}
+(aplicația NopCommerce, portul 8080), cu un \textit{health check} care asigură că
+baza de date este funcțională înainte de pornirea aplicației. Pornirea mediului se
+face cu:
+
+\begin{lstlisting}[language=bash]
+docker compose -f docker-compose.nopcommerce.yml up -d
+\end{lstlisting}
+
+Framework-ul Playwright este implementat în \textbf{Python}. Dependențele se instalează
+și browserele se descarcă cu:
+
+\begin{lstlisting}[language=bash]
+pip install -r requirements.txt
+playwright install
+\end{lstlisting}
+
+Testele se rulează cu:
+
+\begin{lstlisting}[language=bash]
+pytest test_workflows.py
+\end{lstlisting}
+
+Framework-ul Cypress este implementat în \textbf{TypeScript} (modul strict). Dependențele
+se instalează cu:
+
+\begin{lstlisting}[language=bash]
+npm install
+\end{lstlisting}
+
+Testele se rulează headless cu \texttt{npm test} sau în modul interactiv cu
+\texttt{npm run cy:open}.
