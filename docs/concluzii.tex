@@ -1,0 +1,137 @@
+\chapter{Concluzii}
+
+\section{Playwright}
+
+Playwright s-a dovedit un instrument robust și flexibil pentru testarea aplicației
+NopCommerce pe instanța publică, protejată de Cloudflare. Capacitatea de a intercepta
+și valida răspunsuri de rețea prin \texttt{page.expect\_response()} a permis
+sincronizarea precisă cu operațiile AJAX ale platformei, eliminând necesitatea
+așteptărilor bazate pe timp fix. Mecanismul de auto-wait a redus fragilitatea testelor
+în fața variațiilor de latență ale rețelei.
+
+Un avantaj semnificativ a fost integrarea cu ecosistemul Python: fixtures-urile
+\texttt{pytest}, tipizarea prin type hints și biblioteca \texttt{playwright-stealth}
+au permis construirea unei suite funcționale pe un site cu protecție anti-bot, fără
+a recurge la un mediu local. Izolarea contextuală automată între teste a asigurat
+că fiecare rulare pornește dintr-o stare curată, fără interferențe de sesiune.
+
+Principala limitare întâmpinată a fost verbozitatea codului în cazul scenariilor
+condiționale --- absența soft assertions native a obligat la construcții
+\texttt{try/except} repetitive. De asemenea, lipsa unui echivalent vizual al
+Cypress App a făcut ca depanarea eșecurilor să fie mai laborioasă, necesitând
+activarea Trace Viewer înainte de rulare.
+
+În ansamblu, Playwright reprezintă o alegere solidă pentru suite de testare
+complexe, multi-browser, în echipe cu experiență Python sau în scenarii în care
+controlul granular al rețelei este esențial.
+
+% -------------------------------------------------------
+\section{Cypress}
+
+Cypress a oferit cel mai fluid proces de scriere și depanare a testelor din cadrul
+acestui proiect. Funcționalitatea Time Travel Debugging, combinată cu retry-ability-ul
+automat, a redus semnificativ timpul necesar identificării și corectării eșecurilor.
+API-ul \texttt{cy.intercept()} s-a dovedit intuitiv și expresiv, permițând atât
+sincronizarea cu AJAX-ul platformei, cât și inspecția răspunsurilor HTTP cu
+sintaxă minimală.
+
+Decizia de a rula testele pe o instanță Docker locală a eliminat problema Cloudflare,
+oferind un mediu stabil și reproductibil. TypeScript strict a contribuit la calitatea
+codului, detectând erori de selector și de tip la compilare, nu la runtime. Funcțiile
+helper tipizate (\texttt{fillAddressForm}, \texttt{selectPaymentMethodAndContinue})
+au redus duplicarea codului și au crescut lizibilitatea suitei.
+
+Limitările principale au fost legate de arhitectura framework-ului: suportul exclusiv
+pentru Chromium și Firefox, absența unui mecanism de stealth și restricția la un
+singur tab de browser au impus compromisuri de infrastructură (Docker) și au limitat
+acoperirea cross-browser. Asincronicitatea implicită a \textit{command queue}-ului
+Cypress a reprezentat o curbă de învățare pentru scenariile care necesitau accesul
+la valori intermediare.
+
+Cypress rămâne alegerea optimă pentru proiecte în care developer experience-ul și
+viteza de iterație au prioritate, în special când testele rulează pe o infrastructură
+controlată și stack-ul echipei este JavaScript/TypeScript.
+
+% -------------------------------------------------------
+\section{De ce se preferă Playwright în industrie}
+
+În ultimii ani, Playwright a câștigat o poziție dominantă în industrie, depășind
+Cypress ca framework de referință pentru testarea E2E. Raportul \textit{State of JS
+2023} și sondajele comunității indică o adoptare în creștere accelerată, susținută
+de mai mulți factori structurali.
+
+\subsection*{Suport multi-browser real}
+
+Playwright testează nativ pe Chromium, Firefox și WebKit cu același cod și aceeași
+comandă de rulare. Aceasta este o cerință frecventă în organizațiile care livrează
+produse pe multiple platforme și browsere. Cypress acoperă doar Chromium și Firefox,
+iar suportul WebKit rămâne experimental --- o limitare semnificativă pentru echipele
+care trebuie să garanteze compatibilitatea Safari.
+
+\subsection*{Suport multi-limbaj}
+
+Playwright oferă API-uri oficiale pentru Python, TypeScript, Java și C\#. Această
+flexibilitate îl face accesibil echipelor cu stack-uri tehnice diverse și permite
+integrarea testelor E2E în proiecte care nu sunt construite pe JavaScript. Cypress
+este limitat la JavaScript/TypeScript, ceea ce restrânge adoptarea în organizații
+cu echipe mixte.
+
+\subsection*{Arhitectură fără limitări de tab}
+
+Playwright suportă nativ scenarii cu mai multe pagini și tab-uri de browser, ferestre
+noi și contexte de browser independente. Cypress, prin arhitectura sa in-browser,
+nu poate gestiona mai multe tab-uri simultan --- o limitare care devine vizibilă
+în aplicații moderne cu fluxuri OAuth, plăți cu redirect extern sau notificări
+în ferestre pop-up.
+
+\subsection*{Viteza de execuție și paralelism}
+
+Playwright rulează testele în paralel pe mai mulți workeri în mod implicit, fără
+configurare suplimentară. Izolarea prin \texttt{BrowserContext} este mai ușoară și
+mai rapidă decât pornirea unui proces Cypress complet pentru fiecare test. În suite
+mari, diferența de timp de execuție devine semnificativă.
+
+\subsection*{Integrare în CI/CD}
+
+Playwright este proiectat explicit pentru medii headless și CI/CD: binarele de browser
+sunt descărcate și gestionate automat, nu există dependențe de un display server
+(Xvfb), iar rapoartele HTML și fișierele de trace sunt generate nativ. Cypress
+necesită configurare suplimentară în CI pentru medii headless și are limitări legate
+de licențiere pentru Cypress Cloud (dashboard-ul de raportare).
+
+\subsection*{Tabel comparativ}
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Criteriu} & \textbf{Playwright} & \textbf{Cypress} \\
+\midrule
+Browsere suportate       & Chromium, Firefox, WebKit & Chromium, Firefox \\
+Limbaje de scripting     & Python, TS, Java, C\#     & JavaScript / TypeScript \\
+Multi-tab / multi-window & Da                        & Nu (limitare arhitecturală) \\
+Stealth / bypass bot     & Da (plugin oficial)        & Nu \\
+Paralelism nativ         & Da                        & Parțial (Cypress Cloud) \\
+Time Travel Debugging    & Trace Viewer (post-mortem) & Da (live, în Cypress App) \\
+Developer experience     & Bun                       & Excelent \\
+Setup inițial            & Mediu                     & Simplu \\
+Integrare CI/CD          & Excelentă                 & Bună \\
+\bottomrule
+\end{tabular}
+\caption{Comparație Playwright vs. Cypress}
+\label{tab:comparatie}
+\end{table}
+
+\subsection*{Concluzie generală}
+
+Alegerea între Playwright și Cypress depinde de contextul specific al proiectului.
+Cypress rămâne superior din punct de vedere al experienței de dezvoltare și al vitezei
+de iterație în proiecte mici și medii cu echipe JavaScript. Playwright se impune
+în organizații care necesită acoperire cross-browser reală, flexibilitate de limbaj,
+scenarii complexe cu mai multe pagini sau integrare nativă în pipeline-uri CI/CD
+la scară mare.
+
+Tendința din industrie favorizează Playwright tocmai pentru că aceste cerințe ---
+multi-browser, multi-limbaj, CI-first --- sunt din ce în ce mai frecvente în
+proiectele moderne, unde calitatea software-ului trebuie garantată pe platforme
+și configurații diverse, nu doar pe Chrome.

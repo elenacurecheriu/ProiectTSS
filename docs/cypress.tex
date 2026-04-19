@@ -1,0 +1,306 @@
+\chapter{Cypress}
+
+\section{Ce este Cypress?}
+
+Cypress este un framework de testare end-to-end conceput exclusiv pentru aplicații web,
+lansat în 2017 de Cypress.io. Spre deosebire de Playwright, care controlează
+browserul din exterior printr-un protocol de automatizare, Cypress rulează \textbf{direct
+în interiorul browserului}, în același proces JavaScript cu aplicația testată. Această
+arhitectură îi conferă acces nativ la DOM, la rețea și la starea internă a aplicației,
+fără latența unui strat intermediar.
+
+Cypress suportă \textbf{Chromium} (Chrome, Edge) și \textbf{Firefox}. Suportul pentru
+WebKit/Safari este disponibil în versiuni experimentale. Limbajul de scripting este
+\textbf{JavaScript sau TypeScript}, iar în cadrul acestui proiect a fost utilizat
+\textbf{TypeScript în mod strict}.
+
+\section{Facilități principale}
+
+\subsection{Time Travel Debugging}
+
+Cypress App (interfața grafică interactivă) înregistrează un snapshot al DOM-ului înainte
+și după fiecare comandă executată. Trecând cu mouse-ul peste oricare pas din log, interfața
+restaurează vizual starea aplicației la acel moment, permițând inspecția elementelor exact
+în momentul în care comanda a acționat asupra lor. Aceasta este una din facilitățile cele
+mai apreciate de Cypress, eliminând nevoia de a re-rula testul pentru a diagnostica un eșec.
+
+\subsection{Retry-ability automat}
+
+Comenzile Cypress nu returnează imediat o valoare --- ele sunt \textit{lazy} și se re-evaluează
+automat până când condiția este îndeplinită sau timeout-ul expiră. De exemplu,
+\texttt{cy.get('.element').should('be.visible')} va re-interoga DOM-ul repetat timp de până la
+10 secunde (implicit) înainte de a eșua. Această caracteristică elimină necesitatea
+așteptărilor explicite în marea majoritate a cazurilor.
+
+\subsection{Interceptarea rețelei cu \texttt{cy.intercept()}}
+
+Cypress oferă un API de interceptare a cererilor HTTP direct la nivelul browserului.
+Comanda \texttt{cy.intercept()} permite:
+\begin{itemize}
+    \item atribuirea unui alias unei cereri și așteptarea ei cu \texttt{cy.wait('@alias')};
+    \item inspecția răspunsului (status, body);
+    \item modificarea sau blocarea cererilor pentru simularea erorilor.
+\end{itemize}
+
+\subsection{Comenzi reutilizabile și helper functions}
+
+TypeScript permite definirea de funcții helper tipizate, utilizabile în orice test.
+Proiectul folosește această facilitate extensiv pentru a evita duplicarea codului de
+checkout, autentificare și completare formulare.
+
+\subsection{Plugin ecosystem}
+
+Cypress dispune de un ecosistem de plugin-uri pentru extinderea capabilităților native.
+Proiectul utilizează \texttt{cypress-real-events}, care simulează evenimente native de
+browser (hover, drag, scroll real) --- necesare pentru meniurile dropdown care nu
+răspund la evenimentele sintetice Cypress standard.
+
+\subsection{Cypress App --- interfața interactivă}
+
+Comanda \texttt{npm run cy:open} deschide Cypress App, o interfață grafică în care testele
+pot fi rulate individual, cu vizualizarea în timp real a fiecărui pas, a snapshot-urilor DOM
+și a log-ului de rețea. Aceasta accelerează semnificativ procesul de scriere și depanare a testelor.
+
+\section{Configurarea proiectului}
+
+\subsection{Dependențe}
+
+Dependențele sunt definite în \texttt{package.json}:
+
+\begin{lstlisting}[language=bash, caption={Instalare dependențe Cypress}]
+npm install
+\end{lstlisting}
+
+Pachetele principale:
+
+\begin{itemize}
+    \item \texttt{cypress@15.14.0} --- framework-ul principal;
+    \item \texttt{typescript@6.0.3} --- compilatorul TypeScript;
+    \item \texttt{cypress-real-events@1.15.0} --- simulare evenimente native de browser.
+\end{itemize}
+
+\subsection{Fișierul de configurare}
+
+Configurația relevantă din \texttt{cypress.config.js}:
+
+\begin{lstlisting}[language=JavaScript, caption={cypress.config.js}]
+module.exports = defineConfig({
+  chromeWebSecurity: false,
+  video: false,
+  screenshotOnRunFailure: true,
+  e2e: {
+    baseUrl: 'http://localhost:8080',
+    viewportWidth: 1440,
+    viewportHeight: 900,
+    defaultCommandTimeout: 10000,
+    specPattern: 'cypress/e2e/**/*.cy.ts',
+  },
+});
+\end{lstlisting}
+
+\texttt{chromeWebSecurity: false} este necesar pentru a permite accesul cross-origin în
+fluxurile de checkout, unde unele resurse sunt încărcate de pe domenii diferite.
+\texttt{screenshotOnRunFailure: true} salvează automat un screenshot la fiecare test eșuat,
+util pentru diagnosticarea problemelor în rulările headless din CI.
+
+\subsection{Scripturi disponibile}
+
+\begin{itemize}
+    \item \texttt{npm test} --- rulare headless completă (\texttt{cypress run});
+    \item \texttt{npm run cy:open} --- Cypress App, mod interactiv;
+    \item \texttt{npm run cy:run:chrome} --- rulare headed în Chrome;
+    \item \texttt{npm run cy:open:local} --- mod interactiv cu \texttt{baseUrl} explicit pe Docker.
+\end{itemize}
+
+\section{Implementarea testelor}
+
+\subsection{Structura testelor}
+
+Testele sunt organizate cu \texttt{describe} pentru grupare și \texttt{it} pentru cazuri
+individuale, urmând convenția standard Mocha (utilizată intern de Cypress):
+
+\begin{lstlisting}[language=JavaScript, caption={Structura de organizare a testelor}]
+describe('NopCommerce Workflows', () => {
+  describe('Guest Purchase Journeys', () => {
+    it('Guest shopping flow: wishlist -> cart -> checkout success', () => {
+      cy.visit('/');
+      // ...
+    });
+  });
+
+  describe('Account-Based Journeys', () => {
+    it('Register and place an order in the same session', () => {
+      // ...
+    });
+  });
+});
+\end{lstlisting}
+
+\subsection{Funcții helper reutilizabile}
+
+O parte semnificativă a codului este extrasă în funcții helper definite la nivelul fișierului,
+eliminând duplicarea între teste:
+
+\begin{lstlisting}[language=JavaScript, caption={Helper pentru completarea formularelor de adresă}]
+type AddressPayload = {
+  firstName: string; lastName: string; email: string;
+  city: string; address1: string;
+  zipPostalCode: string; phoneNumber: string;
+};
+
+const fillAddressForm = (prefix: string, payload: AddressPayload) => {
+  cy.intercept('GET', '**/getstatesbycountryid*').as(`getStates_${prefix}`);
+  cy.get(`#${prefix}_CountryId`).select('237');
+  cy.get(`#${prefix}_StateProvinceId option`)
+    .should('have.length.greaterThan', 1);
+  cy.get(`#${prefix}_StateProvinceId`).select(1);
+  cy.get(`#${prefix}_FirstName`).clear().type(payload.firstName);
+  // ...
+};
+\end{lstlisting}
+
+Funcția \texttt{fillAddressForm} este apelată cu un prefix diferit pentru fiecare tip de
+adresă (\texttt{BillingNewAddress}, \texttt{ShippingNewAddress}, \texttt{Address}),
+construind dinamic ID-urile câmpurilor.
+
+\subsection{Interceptarea cererilor AJAX}
+
+Interceptarea cererilor AJAX în Cypress se face prin \texttt{cy.intercept()} combinat cu
+\texttt{cy.wait()}. Exemplul următor verifică că răspunsul la filtrarea produselor
+returnează HTTP 200:
+
+\begin{lstlisting}[language=JavaScript, caption={Interceptare AJAX la aplicarea filtrului}]
+cy.intercept('**/*').as('ajaxFilter');
+cy.get("input[id='attribute-option-9']").check({ force: true });
+cy.wait('@ajaxFilter').its('response.statusCode').should('eq', 200);
+\end{lstlisting}
+
+Pentru cereri mai specifice, se folosește o expresie regulată:
+
+\begin{lstlisting}[language=JavaScript, caption={Interceptare cerere de actualizare atribute produs}]
+cy.intercept(/productdetails_attributechange/i).as('attrChange1');
+cy.get("input[name='product_attribute_3'][value='7']").check({ force: true });
+cy.wait('@attrChange1');
+\end{lstlisting}
+
+\subsection{Verificarea prețurilor dinamice}
+
+Funcția utilitară \texttt{toNumber()} curăță textul afișat și îl convertește la număr,
+permițând comparații matematice:
+
+\begin{lstlisting}[language=JavaScript, caption={Extragere și verificare preț dinamic}]
+const toNumber = (text: string) =>
+  Number(text.replace(/[^\d.,-]/g, '').replace(/,/g, ''));
+
+cy.get('div.product-price span').invoke('text').then((basePriceText) => {
+  const basePrice = toNumber(basePriceText);
+
+  // selectie componente + asteptare AJAX
+  cy.intercept(/productdetails_attributechange/i).as('attrChange');
+  cy.get("input[name='product_attribute_3'][value='7']").check({ force: true });
+  cy.wait('@attrChange');
+
+  cy.get('div.product-price span').invoke('text').then((newPriceText) => {
+    const newPrice = toNumber(newPriceText);
+    expect(newPrice).to.be.greaterThan(basePrice);
+  });
+});
+\end{lstlisting}
+
+\subsection{Soft assertions}
+
+Cypress nu oferă soft assertions nativ. Acestea se implementează prin \texttt{cy.get('body').then()}
+care permite inspecția condiționată a DOM-ului fără a opri execuția testului:
+
+\begin{lstlisting}[language=JavaScript, caption={Soft assert pentru cuponul invalid}]
+cy.get('body').then(($body) => {
+  if ($body.find('div.message-failure').length > 0) {
+    cy.get('div.message-failure').first().invoke('text').then((failureText) => {
+      const normalized = failureText.trim().toLowerCase();
+      if (normalized.length > 0) {
+        expect(normalized).to.contain('coupon');
+      } else {
+        cy.log('Coupon container present but empty, skipping assertion.');
+      }
+    });
+  } else {
+    cy.log('Coupon error banner did not appear, continuing as soft assertion.');
+  }
+});
+\end{lstlisting}
+
+\subsection{Hover cu cypress-real-events}
+
+Meniurile dropdown ale NopCommerce se activează la hover. Evenimentele sintetice Cypress
+(\texttt{cy.trigger('mouseover')}) nu declanșează CSS \texttt{:hover} în toate cazurile.
+Plugin-ul \texttt{cypress-real-events} rezolvă aceasta prin simularea unui eveniment nativ:
+
+\begin{lstlisting}[language=JavaScript, caption={Hover nativ pentru meniul dropdown}]
+cy.get("a.menu__link[href='/computers']").realHover();
+cy.get("a[href='/notebooks']").click({ force: true });
+\end{lstlisting}
+
+\subsection{Gestionarea metodelor de plată variabile}
+
+Pe instanța demo, metodele de plată disponibile pot varia. Funcția helper
+\texttt{selectPaymentMethodAndContinue()} gestionează acest caz prin inspecția DOM-ului
+înainte de selecție:
+
+\begin{lstlisting}[language=JavaScript, caption={Selecție robustă a metodei de plată}]
+const selectPaymentMethodAndContinue = () => {
+  cy.get('body').then(($body) => {
+    const creditCardMethod = $body.find(
+      "input[type='radio'][name='paymentmethod'][value*='Manual']"
+    );
+    const allMethods = $body.find(
+      "input[type='radio'][name='paymentmethod']"
+    );
+
+    if (creditCardMethod.length > 0) {
+      cy.wrap(creditCardMethod.first()).check({ force: true });
+      return;
+    }
+    if (allMethods.length > 0) {
+      cy.wrap(allMethods.first()).check({ force: true });
+    }
+  });
+
+  cy.get('.payment-method-next-step-button:visible').click();
+};
+\end{lstlisting}
+
+\section{Avantaje}
+
+\begin{itemize}
+    \item \textbf{Developer experience superior}: Time Travel Debugging, hot reload în Cypress App
+          și feedback vizual în timp real accelerează dramatic procesul de scriere a testelor.
+    \item \textbf{Retry-ability built-in}: eliminarea așteptărilor explicite face testele mai
+          concise și mai reziliente la variații de latență.
+    \item \textbf{\texttt{cy.intercept()} intuitiv}: API-ul de interceptare este simplu și expresiv,
+          cu suport pentru aliasuri și aserțiuni înlănțuite.
+    \item \textbf{TypeScript nativ}: tipizarea strictă detectează erori de selector sau de tip
+          la momentul compilării, nu la runtime.
+    \item \textbf{Setup rapid}: \texttt{npm install} + \texttt{npx cypress open} este suficient
+          pentru a începe --- fără instalare separată de binarele de browser.
+    \item \textbf{Screenshots automate la eșec}: documentarea eșecurilor fără configurare
+          suplimentară.
+\end{itemize}
+
+\section{Dezavantaje}
+
+\begin{itemize}
+    \item \textbf{Suport browser limitat}: Cypress suportă nativ doar Chromium și Firefox.
+          Suportul WebKit/Safari este experimental și nu acoperă toate cazurile de utilizare.
+    \item \textbf{JavaScript/TypeScript exclusiv}: nu există suport pentru Python, Java sau C\#,
+          limitând adoptarea în echipe cu alt stack tehnic.
+    \item \textbf{Fără stealth mode}: Cypress nu are un echivalent al \texttt{playwright-stealth}.
+          Testele pe instanțe protejate de Cloudflare necesită un mediu local (Docker), ceea
+          ce crește complexitatea infrastructurii.
+    \item \textbf{Arhitectură single-tab}: Cypress rulează într-o singură filă de browser;
+          scenariile care implică mai multe tab-uri sau ferestre sunt dificil de testat.
+    \item \textbf{Soft assertions manuale}: similar cu Playwright, absența unui mecanism nativ
+          obligă la construcții \texttt{cy.get('body').then()} verbale.
+    \item \textbf{Asincronicitate implicită}: comenzile Cypress sunt înlănțuite asincron
+          (\textit{command queue}), iar accesul la valori în afara callback-urilor
+          \texttt{.then()} este o sursă frecventă de confuzie pentru utilizatorii noi.
+\end{itemize}
